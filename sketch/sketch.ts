@@ -1,5 +1,5 @@
-import workerPath from "file-loader?name=[name].js!./sketch.worker";
-const worker = new Worker(workerPath);
+// import workerPath from "file-loader?name=[name].js!./sketch.worker";
+const worker = new Worker("./sketch.worker.js");
 
 
 export interface IPoint {
