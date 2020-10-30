@@ -55,26 +55,54 @@ function setup() {
 }
 function draw() {
     background(0);
-    translate(width / 2, height / 2);
-    var colorsArr = ColorHelper.getColorsArray(numberOfShapes);
-    var baseSpeed = (frameCount / 500) * speed.value();
-    for (var i = 0; i < numberOfShapes; i++) {
-        var npoints = 3 + i;
-        var radius = 20 * i;
-        var angle = TWO_PI / npoints;
-        var spin = baseSpeed * (numberOfShapes - i);
-        strokeWeight(3 + i).stroke(colorsArr[i]);
-        push();
-        rotate(spin);
-        beginShape();
-        for (var a = 0; a < TWO_PI; a += angle) {
-            var sx = cos(a) * radius;
-            var sy = sin(a) * radius;
-            vertex(sx, sy);
+    var w = 4;
+    var h = (w * height) / width;
+    var xMin = -w / 2;
+    var yMin = -h / 2;
+    loadPixels();
+    var maxIterations = 100;
+    var xMax = xMin + w;
+    var yMax = yMin + h;
+    var dx = (xMax - xMin) / (width);
+    var dy = (yMax - yMin) / (height);
+    console.log("started");
+    var y = yMin;
+    for (var j = 0; j < height; j++) {
+        var x = xMin;
+        for (var i = 0; i < width; i++) {
+            var a = x;
+            var b = y;
+            var n = 0;
+            while (n < maxIterations) {
+                var aa = a * a;
+                var bb = b * b;
+                var twoab = 2.0 * a * b;
+                a = aa - bb + x;
+                b = twoab + y;
+                if (dist(aa, bb, 0, 0) > 16) {
+                    break;
+                }
+                n++;
+            }
+            var pix = (i + j * width) * 4;
+            var norm_1 = map(n, 0, maxIterations, 0, 1);
+            var bright = map(sqrt(norm_1), 0, 1, 0, 255);
+            if (n == maxIterations) {
+                bright = 0;
+            }
+            else {
+                pixels[pix + 0] = bright;
+                pixels[pix + 1] = bright;
+                pixels[pix + 2] = bright;
+                pixels[pix + 3] = 255;
+            }
+            x += dx;
         }
-        endShape(CLOSE);
-        pop();
+        y += dy;
     }
+    console.log("ended");
+    updatePixels();
+    noLoop();
 }
 function windowResized() {
     resizeCanvas(windowWidth, windowHeight);
