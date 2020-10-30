@@ -1,14 +1,21 @@
 {
-  "compilerOptions": {
-    "mapRoot": "./sketch/",
-    "module": "none",
-    "noImplicitAny": true,
-    "outFile": "./build/build.js",
-    "preserveConstEnums": true,
-    "removeComments": true,
-    "rootDir": "./sketch/",
-    "sourceMap": true,
-    "sourceRoot": "./sketch/",
-    "target": "es5"
-  }
+	"compilerOptions": {
+		"jsx": "react",
+		"module": "es6",
+		"esModuleInterop": true,
+		"noImplicitAny": true,
+		"outDir": "./build/",
+		"preserveConstEnums": true,
+		"removeComments": true,
+		"sourceMap": true,
+		"target": "es5",
+		"baseUrl": ".",
+		"skipLibCheck": true,
+		"paths": {
+			"*": ["node_modules/*", "sketch/types/*", "sketch/*"]
+		}
+	},
+	"compileOnSave": true,
+
+	"include": ["sketch", "global.d.ts"]
 }
