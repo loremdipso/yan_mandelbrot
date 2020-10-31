@@ -1,5 +1,6 @@
 const path = require("path");
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
 
 
 module.exports = {
@@ -10,13 +11,16 @@ module.exports = {
 
 	output: {
 		path: path.resolve(__dirname, "docs"),
-		filename: "bundle.js",
-		publicPath: "/"
+		filename: 'bundle.[contenthash].js',
+
+		// it's weird why this is necessary, but w/e
+		publicPath: "./"
 	},
 
 	devServer: {
 		compress: true,
-		contentBase: path.join(__dirname, 'sketch', 'public'),
+		publicPath: "/",
+		// contentBase: path.join(__dirname, 'sketch', 'public'),
 
 		stats: {
 			warnings: false
@@ -28,6 +32,11 @@ module.exports = {
 		extensions: [".json", ".ts", ".js", ".css", ".scss"],
 		plugins: [new TsconfigPathsPlugin({ configFile: "./tsconfig.json" })],
 	},
+
+	plugins: [new HtmlWebpackPlugin({
+		template: "sketch/public/index.html",
+		inject: "head"
+	})],
 
 	module: {
 		rules: [
@@ -43,7 +52,7 @@ module.exports = {
 			},
 			{
 				test: /\.worker\.js$/,
-				use: { loader: 'worker-loader' },
+				loader: 'worker-loader',
 			},
 		],
 	},

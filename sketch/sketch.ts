@@ -1,11 +1,6 @@
-
 import { Renderer } from "p5";
-
-// const worker = new Worker(workerPath);
-// const worker = new Worker("/sketch.worker.js");
-const worker = new Worker("sketch.worker.js?v=1.1");
-// import workerPath from "file-loader?name=[name].js!./sketch.worker";
-// const worker = new Worker(workerPath);
+import Worker from 'worker-loader!./sketch.worker';
+const worker = new Worker();
 
 
 export interface IPoint {
@@ -118,7 +113,7 @@ let skipThisMovement = false;
 
 
 let state: WWState = WWState.IDLE;
-worker.addEventListener('message', message => {
+worker.addEventListener('message', (message: any) => {
 	loadPixels();
 	state = WWState.RESULTS_READY;
 	let newPixels = message.data;
