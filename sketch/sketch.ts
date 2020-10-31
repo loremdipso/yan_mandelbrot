@@ -1,11 +1,11 @@
-import workerPath from "file-loader?name=[name].js!./sketch.worker";
 
 import { Renderer } from "p5";
 
 // const worker = new Worker(workerPath);
 // const worker = new Worker("/sketch.worker.js");
-// const worker = new Worker("sketch.worker.js");
-const worker = new Worker(workerPath);
+const worker = new Worker("sketch.worker.js");
+// import workerPath from "file-loader?name=[name].js!./sketch.worker";
+// const worker = new Worker(workerPath);
 
 
 export interface IPoint {
