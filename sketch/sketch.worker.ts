@@ -13,6 +13,7 @@ function calculateMandelbrot({
 	height,
 	center,
 	zoom,
+	colorOffset
 }: IToRender): Uint8ClampedArray | null {
 	// Establish a range of values on the complex plane
 	// A different range will allow us to "zoom" in or out on the fractal
@@ -67,15 +68,22 @@ function calculateMandelbrot({
 			// We color each pixel based on how long it takes to get to infinity
 			// If we never got there, let's pick the color black
 			const pix = (i + j * width) * 4;
-			const norm = map(n, 0, maxIterations, 0, 1);
-			let bright = map(Math.sqrt(norm), 0, 1, 0, 255);
+			// const norm = map(n, 0, maxIterations, 0, 1);
+			// let bright = map(Math.sqrt(norm), 0, 1, 0, 255);
+
+			let hue = wrap(map(n, 0, maxIterations, 0, 1) + colorOffset, 0, 1);
+			let lig = map(n, 0, maxIterations, 0.5, 0);
+			let colorRGB = hslToRgb(hue, 0.5, lig);
+
 			if (n == maxIterations) {
-				bright = 0;
+				pixels[pix + 0] = 0;
+				pixels[pix + 1] = 0;
+				pixels[pix + 2] = 0;
+				pixels[pix + 3] = 255;
 			} else {
-				// Gosh, we could make fancy colors here if we wanted
-				pixels[pix + 0] = bright;
-				pixels[pix + 1] = bright;
-				pixels[pix + 2] = bright;
+				pixels[pix + 0] = colorRGB[0];
+				pixels[pix + 1] = colorRGB[1];
+				pixels[pix + 2] = colorRGB[2];
 				pixels[pix + 3] = 255;
 			}
 			x += dx;
@@ -86,7 +94,43 @@ function calculateMandelbrot({
 	return pixels;
 }
 
+// fake wrap, but w/e
+function wrap(v: number, minV: number, maxV: number): number {
+	if (v < minV) {
+		v = Math.abs(v);
+	}
 
+	if (v > minV) {
+		return v - maxV;
+	}
+
+	return v;
+}
+
+function hslToRgb(h: any, s: any, l: any) {
+	var r, g, b;
+
+	if (s == 0) {
+		r = g = b = l; // achromatic
+	} else {
+		var hue2rgb = function hue2rgb(p: any, q: any, t: any) {
+			if (t < 0) t += 1;
+			if (t > 1) t -= 1;
+			if (t < 1 / 6) return p + (q - p) * 6 * t;
+			if (t < 1 / 2) return q;
+			if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6;
+			return p;
+		}
+
+		var q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+		var p = 2 * l - q;
+		r = hue2rgb(p, q, h + 1 / 3);
+		g = hue2rgb(p, q, h);
+		b = hue2rgb(p, q, h - 1 / 3);
+	}
+
+	return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
 
 // fake imports
 function dist(_a: number, _b: number, _c: number, _d: number) {

@@ -1,10 +1,11 @@
-// import workerPath from "file-loader?name=[name].js!./sketch.worker";
-// console.log(workerPath);
+import workerPath from "file-loader?name=[name].js!./sketch.worker";
 
 import { Renderer } from "p5";
 
 // const worker = new Worker(workerPath);
-const worker = new Worker("./sketch.worker.js");
+// const worker = new Worker("/sketch.worker.js");
+// const worker = new Worker("sketch.worker.js");
+const worker = new Worker(workerPath);
 
 
 export interface IPoint {
@@ -25,6 +26,7 @@ export interface IToRender {
 	height: number,
 	center: IPoint,
 	zoom: number,
+	colorOffset: number
 };
 
 
@@ -32,6 +34,7 @@ export interface IToRender {
 let positionX: p5.Element;
 let positionY: p5.Element;
 let zoom: p5.Element;
+let colorOffset: p5.Element;
 
 const ZOOM_STEP = 0.01;
 const ZOOM_SCROLL_STEP = 0.1;
@@ -63,6 +66,10 @@ let canvas: Renderer;
 	zoom = createSlider(0, 5, 5, ZOOM_STEP);
 	zoom.position(10, 50);
 	zoom.style("width", "80px");
+
+	colorOffset = createSlider(0, 1, 0.6, 0.05);
+	colorOffset.position(10, 70);
+	colorOffset.style("width", "80px");
 }
 
 (window as any).mouseWheel = (event: any) => {
@@ -82,20 +89,31 @@ function moveTowardsPoint(point: IPoint) {
 	// TODO: this
 }
 
-let lastMousePosition: IPoint;
-(window as any).touchStarted = (event: MouseEvent) => {
-	lastMousePosition = { x: event.clientX, y: event.clientY };
-}
 
+let lastMousePosition: IPoint;
+let skipThisMovement = false;
 (window as any).touchMoved = (event: MouseEvent) => {
+	if (skipThisMovement) {
+		return;
+	}
+
 	if (lastMousePosition) {
 		let deltaX = event.clientX - lastMousePosition.x;
 		let deltaY = event.clientY - lastMousePosition.y;
 		positionX.value(positionX.value() as number - deltaX * MOVE_STEP);
 		positionY.value(positionY.value() as number - deltaY * MOVE_STEP);
+	} else {
+		if ((event.target as HTMLElement).tagName !== "CANVAS") {
+			skipThisMovement = true;
+			return
+		}
 	}
 
 	lastMousePosition = { x: event.clientX, y: event.clientY };
+}
+
+(window as any).touchEnded = (event: MouseEvent) => {
+	skipThisMovement = false;
 }
 
 
@@ -134,6 +152,7 @@ let shouldDrawBackground = false;
 		let toRender: IToRender = {
 			width, height,
 			zoom: zoom.value() as number,
+			colorOffset: colorOffset.value() as number,
 			center: {
 				x: positionX.value() as number,
 				y: positionY.value() as number
