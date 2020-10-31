@@ -1,4 +1,9 @@
 // import workerPath from "file-loader?name=[name].js!./sketch.worker";
+// console.log(workerPath);
+
+import { Renderer } from "p5";
+
+// const worker = new Worker(workerPath);
 const worker = new Worker("./sketch.worker.js");
 
 
@@ -32,14 +37,20 @@ const ZOOM_STEP = 0.01;
 const ZOOM_SCROLL_STEP = 0.1;
 const MOVE_STEP = 0.01;
 
+let lastRendered = { width: 0, height: 0 };
+let canvas: Renderer;
+
 (window as any).setup = () => {
 	console.log("🚀 - Setup initialized - P5 is running");
 
 	// FULLSCREEN CANVAS
-	let canvas = createCanvas(windowWidth, windowHeight);
+	canvas = createCanvas(windowWidth, windowHeight);
+	getRealSize();
 
 	// SETUP SOME OPTIONS
 	rectMode(CENTER).frameRate(30);
+
+	loadPixels();
 
 	// SPEED SLIDER
 	positionX = createSlider(-0.5, 0.5, 0, MOVE_STEP);
@@ -55,7 +66,6 @@ const MOVE_STEP = 0.01;
 	zoom.style("width", "80px");
 }
 
-
 (window as any).mouseWheel = (event: any) => {
 	doZoom(event.deltaY);
 }
@@ -64,12 +74,10 @@ const MOVE_STEP = 0.01;
 	moveTowardsPoint({ x: event.x, y: event.y });
 }
 
-
 function doZoom(amount: number) {
 	// TODO: scale zoom?
 	zoom.value(zoom.value() as number + amount * ZOOM_SCROLL_STEP);
 }
-
 
 function moveTowardsPoint(point: IPoint) {
 	// TODO: this
@@ -84,13 +92,12 @@ let lastMousePosition: IPoint;
 	if (lastMousePosition) {
 		let deltaX = event.clientX - lastMousePosition.x;
 		let deltaY = event.clientY - lastMousePosition.y;
-		positionX.value(positionX.value() as number + deltaX * MOVE_STEP);
-		positionY.value(positionY.value() as number + deltaY * MOVE_STEP);
+		positionX.value(positionX.value() as number - deltaX * MOVE_STEP);
+		positionY.value(positionY.value() as number - deltaY * MOVE_STEP);
 	}
 
 	lastMousePosition = { x: event.clientX, y: event.clientY };
 }
-
 
 
 let state: WWState = WWState.IDLE;
@@ -102,9 +109,32 @@ worker.addEventListener('message', message => {
 	}
 });
 
-let lastRendered = { width: 0, height: 0 };
+
+let shouldDrawBackground = false;
+(window as any).windowResized = () => {
+	getRealSize();
+	shouldDrawBackground = true;
+	resizeCanvas(windowWidth, windowHeight);
+}
+
+function getRealSize() {
+	// TODO: register bug report, width/height should work fine.
+	// Shouldn't need this hack
+	let ratio = width / parseInt((canvas as any).attribute("width"));
+
+	if (ratio !== 1) {
+		canvas.attribute("width", (width * (1 - ratio)).toString());
+		canvas.attribute("height", (height * ratio).toString());
+	}
+}
+
 
 (window as any).draw = () => {
+	if (shouldDrawBackground) {
+		shouldDrawBackground = false;
+		background(0);
+	}
+
 	if (state == WWState.WORKING) {
 		return;
 	} else if (state == WWState.RESULTS_READY) {
@@ -124,7 +154,8 @@ let lastRendered = { width: 0, height: 0 };
 		if (!deepEqual(lastRendered, toRender)) {
 			lastRendered = toRender;
 			debounce("render func", 200, () => {
-				loadPixels();
+				// hoping we just need to do this once, in setup
+				// loadPixels();
 				worker.postMessage(toRender);
 				worker.postMessage(toRender);
 				state = WWState.WORKING;
@@ -164,9 +195,4 @@ function deepEqual(obj1: any, obj2: any) {
 		}
 	}
 	return true;
-}
-
-
-(window as any).windowResized = () => {
-	resizeCanvas(windowWidth, windowHeight);
 }
