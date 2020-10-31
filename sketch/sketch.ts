@@ -45,12 +45,11 @@ let canvas: Renderer;
 
 	// FULLSCREEN CANVAS
 	canvas = createCanvas(windowWidth, windowHeight);
-	getRealSize();
 
 	// SETUP SOME OPTIONS
 	rectMode(CENTER).frameRate(30);
 
-	loadPixels();
+	pixelDensity(1);
 
 	// SPEED SLIDER
 	positionX = createSlider(-0.5, 0.5, 0, MOVE_STEP);
@@ -102,6 +101,7 @@ let lastMousePosition: IPoint;
 
 let state: WWState = WWState.IDLE;
 worker.addEventListener('message', message => {
+	loadPixels();
 	state = WWState.RESULTS_READY;
 	let newPixels = message.data;
 	for (let i = 0; i < newPixels.length; i++) {
@@ -112,21 +112,10 @@ worker.addEventListener('message', message => {
 
 let shouldDrawBackground = false;
 (window as any).windowResized = () => {
-	getRealSize();
 	shouldDrawBackground = true;
 	resizeCanvas(windowWidth, windowHeight);
 }
 
-function getRealSize() {
-	// TODO: register bug report, width/height should work fine.
-	// Shouldn't need this hack
-	let ratio = width / parseInt((canvas as any).attribute("width"));
-
-	if (ratio !== 1) {
-		canvas.attribute("width", (width * (1 - ratio)).toString());
-		canvas.attribute("height", (height * ratio).toString());
-	}
-}
 
 
 (window as any).draw = () => {
@@ -154,9 +143,6 @@ function getRealSize() {
 		if (!deepEqual(lastRendered, toRender)) {
 			lastRendered = toRender;
 			debounce("render func", 200, () => {
-				// hoping we just need to do this once, in setup
-				// loadPixels();
-				worker.postMessage(toRender);
 				worker.postMessage(toRender);
 				state = WWState.WORKING;
 			});
