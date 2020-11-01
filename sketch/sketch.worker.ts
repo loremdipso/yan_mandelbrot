@@ -1,9 +1,10 @@
 import { IToRender } from "sketch";
 
 addEventListener('message', (message) => {
-	let solution = calculateMandelbrot(message.data);
-	if (solution) {
-		(postMessage as any)(solution);
+	let params = message.data;
+	let newPixels = calculateMandelbrot(params);
+	if (newPixels) {
+		(postMessage as any)({ newPixels, params });
 	}
 });
 
@@ -24,8 +25,9 @@ function calculateMandelbrot({
 	const h = (w * height) / width;
 
 	// Start at negative half the width and height
-	const xMin = -w / 2 + center.x;
-	const yMin = -h / 2 + center.y;
+	let ratio = w / width;
+	const xMin = -w / 2 - ((width / 2 - center.x) * ratio);
+	const yMin = -h / 2 - ((height / 2 - center.y) * ratio);
 
 	// Maximum number of iterations for each point on the complex plane
 	const maxIterations = 100;
@@ -145,13 +147,13 @@ function map(
 	stop2: any,
 	withinBounds?: any
 ) {
-	let newval = (n - start1) / (stop1 - start1) * (stop2 - start2) + start2;
+	let newVal = (n - start1) / (stop1 - start1) * (stop2 - start2) + start2;
 	if (!withinBounds) {
-		return newval;
+		return newVal;
 	}
 	if (start2 < stop2) {
-		return this.constrain(newval, start2, stop2);
+		return this.constrain(newVal, start2, stop2);
 	} else {
-		return this.constrain(newval, stop2, start2);
+		return this.constrain(newVal, stop2, start2);
 	}
 };
