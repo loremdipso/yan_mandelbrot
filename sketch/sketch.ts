@@ -1,6 +1,5 @@
 import { Graphics, Renderer } from "p5";
 import Worker from 'worker-loader!./sketch.worker';
-const worker = new Worker();
 
 
 export interface IPoint {
@@ -9,14 +8,13 @@ export interface IPoint {
 }
 
 
-// modified from https://p5js.org/examples/simulate-the-mandelbrot-set.html
 enum WWState {
 	IDLE,
 	WORKING,
 	RESULTS_READY
 }
 
-export interface IToRender {
+export interface IToRenderPartial {
 	width: number,
 	height: number,
 	center: IPoint,
@@ -24,8 +22,13 @@ export interface IToRender {
 	colorOffset: number
 };
 
+export interface IToRenderFull extends IToRenderPartial {
+	maxIterations: number
+};
+
 
 // GLOBAL VARS & TYPES
+let canvas: Renderer;
 let zoom: p5.Element;
 let colorOffset: p5.Element;
 
@@ -34,33 +37,30 @@ let tempCenter: IPoint = { x: 0, y: 0 };
 
 const ZOOM_STEP = 0.01;
 const ZOOM_SCROLL_STEP = 0.1;
+const ITERATIONS = [25, 50, 100];
+const NUM_WORKERS = 4;
 
-let lastRendered: IToRender = {
+let lastRendered: IToRenderFull = {
 	width: 0,
 	height: 0,
 	center: { x: 0, y: 0 },
 	zoom: 0,
-	colorOffset: 0
+	colorOffset: 0,
+	maxIterations: 0,
 };
-let canvas: Renderer;
 
 (window as any).setup = () => {
-	console.log("🚀 - Setup initialized - P5 is running");
-
-	// FULLSCREEN CANVAS
 	canvas = createCanvas(windowWidth, windowHeight);
-
-	// SETUP SOME OPTIONS
 	rectMode(CENTER).frameRate(30);
 
 	pixelDensity(1);
 
 	zoom = createSlider(0, 5, 5, ZOOM_STEP);
-	zoom.position(10, 50);
+	zoom.position(10, 0);
 	zoom.style("width", "80px");
 
 	colorOffset = createSlider(0, 1, 0.6, 0.05);
-	colorOffset.position(10, 70);
+	colorOffset.position(10, 30);
 	colorOffset.style("width", "80px");
 
 	center.x = width / 2;
@@ -68,7 +68,25 @@ let canvas: Renderer;
 	resetTempCenter();
 
 	setSize();
+	setupWorkers();
 }
+
+
+let workers: Worker[] = [];
+let workerIndex = 0;
+function setupWorkers() {
+	for (let i = 0; i < NUM_WORKERS; i++) {
+		let worker = new Worker();
+		workers.push(worker);
+		worker.addEventListener('message', receiveMessage);
+	}
+}
+
+function enqueue(params: any) {
+	workers[workerIndex].postMessage(params);
+	workerIndex = (workerIndex + 1) % workers.length;
+}
+
 
 (window as any).mouseWheel = (event: any) => {
 	doZoom(event.deltaY);
@@ -119,19 +137,25 @@ let skipThisMovement = false;
 
 
 let state: WWState = WWState.IDLE;
-worker.addEventListener('message', (message: any) => {
-	let { newPixels, params } = message.data;
+const receiveMessage = (message: any) => {
+	let newPixels: Uint8ClampedArray = message.data.newPixels;
+	let params: IToRenderFull = message.data.params;
 
 	// if a job gets returned but is no longer needed, ignore it completely
-	if (deepEqual(params, lastRendered)) {
-		buffer.loadPixels();
-		state = WWState.RESULTS_READY;
-		for (let i = 0; i < newPixels.length; i++) {
-			buffer.pixels[i] = newPixels[i];
+	type K = keyof IToRenderFull;
+	let toIgnore: K[] = ["maxIterations"];
+	if (deepEqualInclusive(lastRendered, params, toIgnore)) {
+		// only render if it's more precise than previous
+		if (lastRendered.maxIterations < params.maxIterations) {
+			buffer.loadPixels();
+			state = WWState.RESULTS_READY;
+			for (let i = 0; i < newPixels.length; i++) {
+				buffer.pixels[i] = newPixels[i];
+			}
+			buffer.updatePixels();
 		}
-		buffer.updatePixels();
 	}
-});
+}
 
 
 let shouldDrawBackground = false;
@@ -166,18 +190,24 @@ function setSize() {
 		// updatePixels();
 		state = WWState.IDLE;
 	} else if (state === WWState.IDLE) {
-		let toRender: IToRender = {
+		let toRender: IToRenderPartial = {
 			width, height,
 			zoom: zoom.value() as number,
 			colorOffset: colorOffset.value() as number,
 			center: { ...center }
 		};
 
-		if (!deepEqual(lastRendered, toRender)) {
-			lastRendered = toRender;
-			debounce("render func", 200, () => {
-				worker.postMessage(toRender);
+		if (!deepEqualInclusive(toRender, lastRendered)) {
+			lastRendered = { ...toRender, maxIterations: 0 };
+			debounce("render func", 100, () => {
 				state = WWState.WORKING;
+				for (let its of ITERATIONS) {
+					let params: IToRenderFull = {
+						...toRender,
+						maxIterations: its
+					};
+					enqueue(params);
+				}
 			});
 
 			background(0);
@@ -192,7 +222,6 @@ function setSize() {
 	}
 }
 
-
 let debounce = (() => {
 	let callbacks: { [key: string]: number } = {};
 	return (identifier: string, ms: number, cb: Function) => {
@@ -204,7 +233,9 @@ let debounce = (() => {
 	}
 })();
 
-function deepEqual(obj1: any, obj2: any) {
+// Purposefully only compares elements of first argument to that of the second argument.
+// That is, we're okay if the second argument has extra params.
+function deepEqualInclusive(obj1: any, obj2: any, toIgnore: string[] = []) {
 	if (obj1 === obj2) {
 		return true;
 	}
@@ -212,9 +243,12 @@ function deepEqual(obj1: any, obj2: any) {
 		return false;
 	}
 	for (let key in obj1) {
+		if (toIgnore.findIndex((value, _) => value === key) >= 0) {
+			continue;
+		}
 		if (obj1[key] !== obj2[key]) {
 			if (typeof obj1[key] === 'object') {
-				if (!deepEqual(obj1[key], obj2[key])) {
+				if (!deepEqualInclusive(obj1[key], obj2[key])) {
 					return false;
 				}
 			} else {

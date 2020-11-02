@@ -1,4 +1,4 @@
-import { IToRender } from "sketch";
+import { IToRenderFull } from "sketch";
 
 addEventListener('message', (message) => {
 	let params = message.data;
@@ -9,13 +9,17 @@ addEventListener('message', (message) => {
 });
 
 
+// modified from https://p5js.org/examples/simulate-the-mandelbrot-set.html
 function calculateMandelbrot({
 	width,
 	height,
 	center,
 	zoom,
-	colorOffset
-}: IToRender): Uint8ClampedArray | null {
+	colorOffset,
+
+	// Maximum number of iterations for each point on the complex plane
+	maxIterations
+}: IToRenderFull): Uint8ClampedArray | null {
 	// Establish a range of values on the complex plane
 	// A different range will allow us to "zoom" in or out on the fractal
 	let pixels = new Uint8ClampedArray(width * height * 4);
@@ -29,8 +33,6 @@ function calculateMandelbrot({
 	const xMin = -w / 2 - ((width / 2 - center.x) * ratio);
 	const yMin = -h / 2 - ((height / 2 - center.y) * ratio);
 
-	// Maximum number of iterations for each point on the complex plane
-	const maxIterations = 100;
 
 	// x goes from xMin to xMax
 	const xMax = xMin + w;
