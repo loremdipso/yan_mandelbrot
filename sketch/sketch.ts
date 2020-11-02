@@ -29,7 +29,7 @@ export interface IToRenderFull extends IToRenderPartial {
 
 // GLOBAL VARS & TYPES
 let canvas: Renderer;
-let zoom: p5.Element;
+let zoom: number = 5;
 let colorOffset: p5.Element;
 
 let center: IPoint = { x: 0, y: 0 };
@@ -55,12 +55,8 @@ let lastRendered: IToRenderFull = {
 
 	pixelDensity(1);
 
-	zoom = createSlider(0, 5, 5, ZOOM_STEP);
-	zoom.position(10, 0);
-	zoom.style("width", "80px");
-
 	colorOffset = createSlider(0, 1, 0.6, 0.05);
-	colorOffset.position(10, 30);
+	colorOffset.position(10, 0);
 	colorOffset.style("width", "80px");
 
 	center.x = width / 2;
@@ -89,20 +85,15 @@ function enqueue(params: any) {
 
 
 (window as any).mouseWheel = (event: any) => {
-	doZoom(event.deltaY);
+	doZoom(event.deltaY, center);
 }
 (window as any).doubleClicked = (event: any) => {
-	doZoom(-10);
-	moveTowardsPoint({ x: event.x, y: event.y });
+	doZoom(-10, { x: event.x, y: event.y });
 }
 
-function doZoom(amount: number) {
-	// TODO: scale zoom?
-	zoom.value(zoom.value() as number + amount * ZOOM_SCROLL_STEP);
-}
-
-function moveTowardsPoint(point: IPoint) {
-	// TODO: this
+function doZoom(amount: number, target: IPoint) {
+	zoom += amount * ZOOM_SCROLL_STEP;
+	// TODO: improve zooming
 }
 
 
@@ -191,8 +182,7 @@ function setSize() {
 		state = WWState.IDLE;
 	} else if (state === WWState.IDLE) {
 		let toRender: IToRenderPartial = {
-			width, height,
-			zoom: zoom.value() as number,
+			width, height, zoom,
 			colorOffset: colorOffset.value() as number,
 			center: { ...center }
 		};
