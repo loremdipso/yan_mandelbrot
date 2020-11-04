@@ -1,11 +1,23 @@
 import { IToRenderFull } from "sketch";
 
+const DEBUG = false;
+const llog = (...args: any[]) => {
+	if (DEBUG) {
+		console.log(...args);
+	}
+}
+
 addEventListener('message', (message) => {
+	llog("Starting render...");
+
 	let params = message.data;
 	let newPixels = calculateMandelbrot(params);
 	if (newPixels) {
+		llog("There were pixels");
 		(postMessage as any)({ newPixels, params });
 	}
+
+	llog("Finished render...");
 });
 
 

@@ -20,12 +20,14 @@ module.exports = {
 	devServer: {
 		compress: true,
 		publicPath: "/",
-		// contentBase: path.join(__dirname, 'sketch', 'public'),
 
 		stats: {
 			warnings: false
 		},
-		port: 9000
+		port: 9000,
+
+		// uncomment if you want to listen at your IP as well as localhost
+		// host: '0.0.0.0'
 	},
 
 	resolve: {

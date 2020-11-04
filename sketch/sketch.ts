@@ -40,6 +40,14 @@ const ZOOM_SCROLL_STEP = 0.1;
 const ITERATIONS = [25, 50, 100];
 const NUM_WORKERS = 4;
 
+const DEBUG = false;
+
+const llog = (...args: any[]) => {
+	if (DEBUG) {
+		console.log(...args);
+	}
+}
+
 let lastRendered: IToRenderFull = {
 	width: 0,
 	height: 0,
@@ -56,7 +64,7 @@ let lastRendered: IToRenderFull = {
 	pixelDensity(1);
 
 	colorOffset = createSlider(0, 1, 0.6, 0.05);
-	colorOffset.position(10, 0);
+	colorOffset.position(10, 10);
 	colorOffset.style("width", "80px");
 
 	center.x = width / 2;
@@ -69,18 +77,28 @@ let lastRendered: IToRenderFull = {
 
 
 let workers: Worker[] = [];
+let numActiveWorkers = 0;
 let workerIndex = 0;
 function setupWorkers() {
 	for (let i = 0; i < NUM_WORKERS; i++) {
 		let worker = new Worker();
 		workers.push(worker);
-		worker.addEventListener('message', receiveMessage);
+		worker.addEventListener('message', (message: any) => {
+			receiveMessage(message);
+			dequeue();
+		});
 	}
 }
 
+function dequeue() {
+	numActiveWorkers--;
+}
+
 function enqueue(params: any) {
+	llog("enqueueing...");
 	workers[workerIndex].postMessage(params);
 	workerIndex = (workerIndex + 1) % workers.length;
+	numActiveWorkers++;
 }
 
 
@@ -100,13 +118,15 @@ function doZoom(amount: number, target: IPoint) {
 let lastMousePosition: IPoint;
 let skipThisMovement = false;
 (window as any).touchMoved = (event: MouseEvent) => {
+	llog("moved");
 	if (skipThisMovement) {
 		return;
 	}
 
 	if (lastMousePosition) {
-		let deltaX = event.clientX - lastMousePosition.x;
-		let deltaY = event.clientY - lastMousePosition.y;
+		let newPosition = getPosition(event);
+		let deltaX = newPosition.x - lastMousePosition.x;
+		let deltaY = newPosition.y - lastMousePosition.y;
 		center.x -= deltaX;
 		center.y -= deltaY;
 		tempCenter.x -= deltaX;
@@ -118,10 +138,26 @@ let skipThisMovement = false;
 		}
 	}
 
-	lastMousePosition = { x: event.clientX, y: event.clientY };
+	lastMousePosition = getPosition(event);
+}
+
+function getPosition(event: MouseEvent | TouchEvent): IPoint {
+	if ((event as TouchEvent).touches) {
+		event = event as TouchEvent;
+		if (event.touches.length > 0) {
+			let touch = event.changedTouches.item(0);
+			return { x: touch.clientX, y: touch.clientY };
+		} else {
+			return { x: 0, y: 0 };
+		}
+	} else {
+		event = event as MouseEvent;
+		return { x: event.clientX, y: event.clientY };
+	}
 }
 
 (window as any).touchEnded = (event: MouseEvent) => {
+	llog("touch ended");
 	skipThisMovement = false;
 	lastMousePosition = null;
 }
@@ -173,9 +209,7 @@ function setSize() {
 		background(0);
 	}
 
-	if (state == WWState.WORKING) {
-		return;
-	} else if (state == WWState.RESULTS_READY) {
+	if (state == WWState.RESULTS_READY) {
 		resetTempCenter();
 		image(buffer, 0, 0, width, height);
 		// updatePixels();
@@ -187,7 +221,8 @@ function setSize() {
 			center: { ...center }
 		};
 
-		if (!deepEqualInclusive(toRender, lastRendered)) {
+		if (!deepEqualInclusive(toRender, lastRendered, ["maxIterations"])) {
+			llog("Will you run me?");
 			lastRendered = { ...toRender, maxIterations: 0 };
 			debounce("render func", 100, () => {
 				state = WWState.WORKING;
@@ -209,6 +244,19 @@ function setSize() {
 				height
 			);
 		}
+	}
+
+	// loading bar
+	llog("active workers", numActiveWorkers);
+	if (numActiveWorkers > 0) {
+		strokeWeight(10);
+		let x = map(numActiveWorkers + 1, 0, NUM_WORKERS + 1, width, 0);
+
+		stroke(0, 0, 0);
+		line(0, 0, width, 0);
+
+		stroke(255, 0, 0);
+		line(0, 0, x, 0);
 	}
 }
 
@@ -237,18 +285,32 @@ function deepEqualInclusive(obj1: any, obj2: any, toIgnore: string[] = []) {
 			continue;
 		}
 		if (obj1[key] !== obj2[key]) {
-			if (typeof obj1[key] === 'object') {
-				if (!deepEqualInclusive(obj1[key], obj2[key])) {
+			switch (typeof obj1[key]) {
+				case "object":
+					if (!deepEqualInclusive(obj1[key], obj2[key])) {
+						return false;
+					}
+					break;
+
+				case "number":
+					if (!areFloatsEqual(obj1[key], obj2[key])) {
+						return false;
+					}
+					break;
+
+				default:
 					return false;
-				}
-			} else {
-				return false;
 			}
 		}
 	}
 	return true;
 }
 
+
+const EPSILON = 0.0001;
+function areFloatsEqual(num1: number, num2: number): boolean {
+	return Math.abs(num1 - num2) < EPSILON;
+}
 
 function resetTempCenter() {
 	tempCenter.x = width / 2;
